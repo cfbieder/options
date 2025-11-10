@@ -16,3 +16,6 @@ Evaluator.getGraph(ticker)
 
 # %%
 Evaluator.screenCC()
+
+# %%
+Evaluator.getOptions('SPY')

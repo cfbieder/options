@@ -1,4 +1,5 @@
 # %%
+
 #Load required libraries
 import pandas as pd
 import yfinance as yf
@@ -19,13 +20,26 @@ class Evaluator:
         #!pip install yfinance
         #!pip install matplotlib
         #!pip install scipy
-
-        df = pd.read_fwf("call.txt",skiprows=38)
+        obb.user.preferences.output_type = "dataframe"
+        df = pd.read_fwf("call.txt",skiprows=38,index_col=False,infer_nrows=200)
         self.df_call = df.drop(df.loc[df['Symb'].str.contains('Symb')].index)
+        self.df_call[['Month','Strike']] = self.df_call['Opt  StrkMn'].str.split(' ', n=1, expand=True)
+        self.df_call = self.df_call.drop('Opt  StrkMn', axis=1)
         self.df_call['AERTNC'] = self.df_call['AERTNC'].astype(float)
         self.df_call['PrDBE'] = self.df_call['PrDBE'].astype(float)
         self.df_call['PrRIE'] = self.df_call['PrRIE'].astype(float)
         self.df_call['PrUBE'] = self.df_call['PrUBE'].astype(float)
+
+        df = pd.read_fwf("put.txt",skiprows=45,index_col=False,infer_nrows=200)
+        self.df_put = df.drop(df.loc[df['Symb'].str.contains('Symb')].index)
+        
+        self.df_put = self.df_put.rename({'Opt': 'Month', 'StrkMn': 'Strike'},axis=1)
+        self.df_put['AERTNC'] = self.df_call['AERTNC'].astype(float)
+        self.df_put['PrDBE'] = self.df_call['PrDBE'].astype(float)
+        self.df_put['PrRIE'] = self.df_call['PrRIE'].astype(float)
+        self.df_put['PrUBE'] = self.df_call['PrUBE'].astype(float)
+        print (self.df_put.keys())
+        
 
 
     def getQuote(self,ticker):
@@ -79,7 +93,7 @@ class Evaluator:
         #print (df_call.head())
         print ("TEST2")
 
-    def screenCC(self,prDBE=80,prRIE=20,prUBE=5,aERTNC=20):
+    def screenCC(self,prDBE=60,prRIE=20,prUBE=5,aERTNC=20,month = '*'):
         # Probability of being above the downside breakeven point at expiration (PrDBE)
         # fairly high downside protection (PrDBE) – say nearly 60% or more,
         #prDBE = 80
@@ -92,16 +106,48 @@ class Evaluator:
         # Expected Return
         #aERTNC = 15
         
-        rslt_df = self.df_call[(self.df_call['AERTNC'] >= aERTNC) & (self.df_call['PrDBE'] >= prDBE) & (self.df_call['PrRIE'] >= prRIE) & ((self.df_call['PrRIE'] - self.df_call['PrUBE']) >=prUBE )  ]
-        print (rslt_df[['Symb','Stk','Opt  StrkMn','Call','AERTNC','PrDBE','PrRIE','PrUBE','Invt']])
+        rslt_df = self.df_call[(self.df_call['AERTNC'] >= aERTNC) & (self.df_call['AERTNC'] <= 40) & (self.df_call['PrDBE'] >= prDBE) & (self.df_call['PrRIE'] >= prRIE) & ((self.df_call['PrRIE'] - self.df_call['PrUBE']) >=prUBE )  ]
+        #
+        if (month != '*'):
+            rslt_df = rslt_df[(rslt_df['Month'] == month)]
+        print (rslt_df[['Symb','Stk','Month','Strike','Call','AERTNC','PrDBE','PrRIE','PrUBE','Invt']])
 
 
+    def screenNP(self,prDBE=80,prRIE=20,prUBE=5,aERTNC=20,month = '*'):
+        # Probability of being above the downside breakeven point at expiration (PrDBE)
+        # fairly high downside protection (PrDBE) – say nearly 60% or more,
+        #prDBE = 80
+        #Probability of being called away, or making the Return If Exercised (PrRIE)
+        #a reasonable expectation of being called away (PrRIE) – say 20% or more
+        #prRIE = 20
+        #Probability of being above the upside breakeven point at expiration (PrUBE)
+        # and a PrUBE of at least 5% less than the PrRIE,
+        #prUBE = 5
+        # Expected Return
+        #aERTNC = 15
+        
+        rslt_df = self.df_put[(self.df_put['AERTNC'] >= aERTNC) & (self.df_put['PrDBE'] >= prDBE) & (self.df_put['PrRIE'] >= prRIE) & ((self.df_call['PrRIE'] - self.df_call['PrUBE']) >=prUBE )  ]
+        if (month != '*'):
+            rslt_df = rslt_df[(rslt_df['Month'] == month)]
+        print (rslt_df[['Symb','Stk','Month','Strike','Put','AERTNC','PrDBE','PrRIE','PrUBE','PutIV']])
+
+
+
+    def getOptions(self,ticker):
+        data = obb.derivatives.options.chains(symbol=ticker, provider='yfinance')
+        data_call = data[data['option_type'] == 'call']
+        #data = obb.equity.price.historical("SPY", provider="yfinance")
+        print (data_call)
 
 
 # %%
 evaluator = Evaluator()
-ticker = 'LLY'
-evaluator.getQuote(ticker)
+
 # %%
-evaluator.getGraph(ticker)
+#evaluator.screenNP(month = 'Jan')
+
+evaluator.screenCC()
+
+#evaluator.getOptions('LLY')
+
 # %%
